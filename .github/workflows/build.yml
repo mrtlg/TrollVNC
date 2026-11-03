@@ -179,7 +179,8 @@ jobs:
           if-no-files-found: warn
 
   release:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/release'
+    # RUN IF: It's a push to the release branch OR a manual workflow run
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/release') || github.event_name == 'workflow_dispatch'
     needs: build
     runs-on: macos-14
 
@@ -200,10 +201,16 @@ jobs:
           # Read PACKAGE_VERSION from Makefile
           PACKAGE_VERSION=$(grep 'PACKAGE_VERSION' Makefile | cut -d' ' -f4)
           TAG_NAME="v$PACKAGE_VERSION"
+          
+          # If triggered manually, append the unique run number to avoid duplicate tag conflicts
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG_NAME="v${PACKAGE_VERSION}-build${{ github.run_number }}"
+          fi
+          
           echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag.outputs.tag_name }}
           name: Release ${{ steps.tag.outputs.tag_name }}
